@@ -3,3 +3,33 @@
   vertical-align: top;
   border: 1px solid salmon;
 }
+
+:root {
+  --page-bg: #f7f7fb;
+}
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--page-bg);
+  min-height: 100%;
+  font-family:
+    system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+}
+
+#app {
+  padding: 2rem;
+}
+
+#app-title {
+  margin: 0 0 1rem 0;
+  line-height: 1.2;
+  font-size: clamp(1.5rem, 2vw + 1rem, 2.25rem);
+  font-weight: 700;
+}
+
+.app-canvas {
+  border: 1px solid #111;
+  border-radius: 12px;
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.12));
+  display: block;
+}
