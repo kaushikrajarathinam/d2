@@ -34,7 +34,7 @@ const sizeSlider = document.createElement("input");
 sizeSlider.type = "range";
 sizeSlider.min = "1";
 sizeSlider.max = "24";
-sizeSlider.value = "3";
+sizeSlider.value = "6";
 sizeSlider.step = "1";
 sizeWrap.appendChild(sizeSlider);
 
