@@ -278,7 +278,7 @@ let currentSticker: Sticker | null = null;
 let preview: Drawable = new MarkerPreview(currentWidth, currentColor);
 
 const STICKER_FACTOR = 3.5;
-let stickers: string[] = ["✨", "🍀", "🎯", "💥"];
+const stickers: string[] = ["✨", "🍀", "🎯", "💥"];
 
 function createStickerButton(s: string) {
   const b = document.createElement("button");
