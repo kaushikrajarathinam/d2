@@ -21,22 +21,44 @@ const clearBtn = document.createElement("button");
 clearBtn.textContent = "Clear";
 toolbar.appendChild(clearBtn);
 
-const sizeWrap = document.createElement("label");
-sizeWrap.style.marginLeft = "8px";
-sizeWrap.textContent = "Size:";
-toolbar.appendChild(sizeWrap);
+const sliders = document.createElement("div");
+sliders.style.display = "inline-flex";
+sliders.style.flexDirection = "column";
+sliders.style.gap = "6px";
+sliders.style.marginLeft = "12px";
+toolbar.appendChild(sliders);
 
-const sizeValue = document.createElement("span");
-sizeValue.style.margin = "0 6px";
-sizeWrap.appendChild(sizeValue);
+function makeSlider(
+  labelText: string,
+  min: string,
+  max: string,
+  value: string,
+  step: string,
+) {
+  const wrap = document.createElement("label");
+  wrap.style.display = "flex";
+  wrap.style.alignItems = "center";
+  wrap.style.gap = "8px";
+  const title = document.createElement("span");
+  title.textContent = labelText;
+  const val = document.createElement("span");
+  val.style.minWidth = "2ch";
+  const input = document.createElement("input");
+  input.type = "range";
+  input.min = min;
+  input.max = max;
+  input.value = value;
+  input.step = step;
+  wrap.appendChild(title);
+  wrap.appendChild(val);
+  wrap.appendChild(input);
+  sliders.appendChild(wrap);
+  return { wrap, title, val, input };
+}
 
-const sizeSlider = document.createElement("input");
-sizeSlider.type = "range";
-sizeSlider.min = "1";
-sizeSlider.max = "24";
-sizeSlider.value = "6";
-sizeSlider.step = "1";
-sizeWrap.appendChild(sizeSlider);
+const sizeUI = makeSlider("Size", "2", "36", "8", "1");
+const hueUI = makeSlider("Hue", "0", "360", "210", "1");
+const rotUI = makeSlider("Rotation", "0", "360", "0", "1");
 
 const toolWrap = document.createElement("div");
 toolWrap.style.display = "inline-flex";
@@ -74,7 +96,7 @@ canvas.addEventListener("mouseleave", () => {
 const ctx = canvas.getContext("2d")!;
 ctx.lineCap = "round";
 ctx.lineJoin = "round";
-ctx.strokeStyle = "#111";
+ctx.strokeStyle = "#222";
 
 type Point = { x: number; y: number };
 
@@ -82,28 +104,42 @@ interface Drawable {
   display(ctx: CanvasRenderingContext2D): void;
 }
 
+function hslColor(h: number) {
+  return `hsl(${h}, 90%, 30%)`;
+}
+function deg2rad(d: number) {
+  return d * Math.PI / 180;
+}
+
 class MarkerStroke implements Drawable {
   private points: Point[] = [];
   private width: number;
-  constructor(start: Point, width: number) {
+  private color: string;
+  constructor(start: Point, width: number, color: string) {
     this.points.push(start);
     this.width = width;
+    this.color = color;
   }
   drag(p: Point) {
     this.points.push(p);
   }
   display(ctx: CanvasRenderingContext2D) {
     if (this.points.length === 0) return;
-    const prev = ctx.lineWidth;
+    const prevW = ctx.lineWidth;
+    const prevS = ctx.strokeStyle;
+    const prevF = ctx.fillStyle;
     ctx.lineWidth = this.width;
+    ctx.strokeStyle = this.color;
+    ctx.fillStyle = this.color;
     if (this.points.length === 1) {
       const p = this.points[0];
       ctx.beginPath();
       ctx.arc(p.x, p.y, ctx.lineWidth / 2, 0, Math.PI * 2);
-      ctx.fillStyle = ctx.strokeStyle as string;
       ctx.fill();
       ctx.closePath();
-      ctx.lineWidth = prev;
+      ctx.lineWidth = prevW;
+      ctx.strokeStyle = prevS;
+      ctx.fillStyle = prevF;
       return;
     }
     ctx.beginPath();
@@ -113,15 +149,19 @@ class MarkerStroke implements Drawable {
     }
     ctx.stroke();
     ctx.closePath();
-    ctx.lineWidth = prev;
+    ctx.lineWidth = prevW;
+    ctx.strokeStyle = prevS;
+    ctx.fillStyle = prevF;
   }
 }
 
 class MarkerPreview implements Drawable {
   private p: Point | null = null;
   private width: number;
-  constructor(width: number) {
+  private color: string;
+  constructor(width: number, color: string) {
     this.width = width;
+    this.color = color;
   }
   setPosition(p: Point | null) {
     this.p = p;
@@ -129,15 +169,20 @@ class MarkerPreview implements Drawable {
   setWidth(w: number) {
     this.width = w;
   }
+  setColor(c: string) {
+    this.color = c;
+  }
   display(ctx: CanvasRenderingContext2D) {
     if (!this.p) return;
-    const prev = ctx.lineWidth;
+    const prevW = ctx.lineWidth, prevS = ctx.strokeStyle;
     ctx.lineWidth = 1;
+    ctx.strokeStyle = this.color;
     ctx.beginPath();
     ctx.arc(this.p.x, this.p.y, this.width / 2, 0, Math.PI * 2);
     ctx.stroke();
     ctx.closePath();
-    ctx.lineWidth = prev;
+    ctx.lineWidth = prevW;
+    ctx.strokeStyle = prevS;
   }
 }
 
@@ -145,21 +190,25 @@ class Sticker implements Drawable {
   private p: Point;
   private emoji: string;
   private size: number;
-  constructor(p: Point, emoji: string, size: number) {
+  private rotationDeg: number;
+  constructor(p: Point, emoji: string, size: number, rotationDeg: number) {
     this.p = p;
     this.emoji = emoji;
     this.size = size;
+    this.rotationDeg = rotationDeg;
   }
   drag(p: Point) {
     this.p = p;
   }
   display(ctx: CanvasRenderingContext2D) {
     ctx.save();
+    ctx.translate(this.p.x, this.p.y);
+    ctx.rotate(deg2rad(this.rotationDeg));
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font =
       `${this.size}px system-ui, Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif`;
-    ctx.fillText(this.emoji, this.p.x, this.p.y);
+    ctx.fillText(this.emoji, 0, 0);
     ctx.restore();
   }
 }
@@ -168,9 +217,11 @@ class StickerPreview implements Drawable {
   private p: Point | null = null;
   private emoji: string;
   private size: number;
-  constructor(emoji: string, size: number) {
+  private rotationDeg: number;
+  constructor(emoji: string, size: number, rotationDeg: number) {
     this.emoji = emoji;
     this.size = size;
+    this.rotationDeg = rotationDeg;
   }
   setPosition(p: Point | null) {
     this.p = p;
@@ -181,15 +232,20 @@ class StickerPreview implements Drawable {
   setSize(s: number) {
     this.size = s;
   }
+  setRotation(d: number) {
+    this.rotationDeg = d;
+  }
   display(ctx: CanvasRenderingContext2D) {
     if (!this.p) return;
     ctx.save();
     ctx.globalAlpha = 0.6;
+    ctx.translate(this.p.x, this.p.y);
+    ctx.rotate(deg2rad(this.rotationDeg));
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font =
       `${this.size}px system-ui, Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif`;
-    ctx.fillText(this.emoji, this.p.x, this.p.y);
+    ctx.fillText(this.emoji, 0, 0);
     ctx.restore();
   }
 }
@@ -210,14 +266,19 @@ canvas.addEventListener(DRAWING_CHANGED, renderAll);
 canvas.addEventListener(TOOL_MOVED, renderAll);
 
 let drawing = false;
-let currentWidth = parseInt(sizeSlider.value, 10);
+let currentWidth = parseInt(sizeUI.input.value, 10);
+let currentHue = parseInt(hueUI.input.value, 10);
+let currentColor = hslColor(currentHue);
+let currentRotation = parseInt(rotUI.input.value, 10);
+
 let tool: "marker" | "sticker" = "marker";
-let stickerChar = "😀";
+let stickerChar = "✨";
 let currentStroke: MarkerStroke | null = null;
 let currentSticker: Sticker | null = null;
-let preview: Drawable = new MarkerPreview(currentWidth);
+let preview: Drawable = new MarkerPreview(currentWidth, currentColor);
 
-let stickers: string[] = ["😀", "⭐️", "🔥"];
+const STICKER_FACTOR = 3.5;
+let stickers: string[] = ["✨", "🍀", "🎯", "💥"];
 
 function createStickerButton(s: string) {
   const b = document.createElement("button");
@@ -225,7 +286,11 @@ function createStickerButton(s: string) {
   b.addEventListener("click", () => {
     tool = "sticker";
     stickerChar = s;
-    preview = new StickerPreview(stickerChar, currentWidth * 3);
+    preview = new StickerPreview(
+      stickerChar,
+      Math.round(currentWidth * STICKER_FACTOR),
+      currentRotation,
+    );
     canvas.dispatchEvent(new Event(TOOL_MOVED));
   });
   stickerWrap.insertBefore(b, addStickerBtn);
@@ -240,24 +305,48 @@ addStickerBtn.addEventListener("click", () => {
   createStickerButton(t);
   tool = "sticker";
   stickerChar = t;
-  preview = new StickerPreview(stickerChar, currentWidth * 3);
+  preview = new StickerPreview(
+    stickerChar,
+    Math.round(currentWidth * STICKER_FACTOR),
+    currentRotation,
+  );
   canvas.dispatchEvent(new Event(TOOL_MOVED));
 });
 
-sizeValue.textContent = String(currentWidth);
-sizeSlider.addEventListener("input", () => {
-  currentWidth = parseInt(sizeSlider.value, 10);
+sizeUI.val.textContent = String(currentWidth);
+hueUI.val.textContent = String(currentHue);
+rotUI.val.textContent = String(currentRotation);
+
+sizeUI.input.addEventListener("input", () => {
+  currentWidth = parseInt(sizeUI.input.value, 10);
+  sizeUI.val.textContent = String(currentWidth);
   if (tool === "marker" && preview instanceof MarkerPreview) {
     preview.setWidth(currentWidth);
-  } else if (tool === "sticker" && preview instanceof StickerPreview) {
-    preview.setSize(currentWidth * 3);
   }
+  if (tool === "sticker" && preview instanceof StickerPreview) {
+    preview.setSize(Math.round(currentWidth * STICKER_FACTOR));
+  }
+  if (!drawing) canvas.dispatchEvent(new Event(TOOL_MOVED));
+});
+
+hueUI.input.addEventListener("input", () => {
+  currentHue = parseInt(hueUI.input.value, 10);
+  hueUI.val.textContent = String(currentHue);
+  currentColor = hslColor(currentHue);
+  if (preview instanceof MarkerPreview) preview.setColor(currentColor);
+  if (!drawing) canvas.dispatchEvent(new Event(TOOL_MOVED));
+});
+
+rotUI.input.addEventListener("input", () => {
+  currentRotation = parseInt(rotUI.input.value, 10);
+  rotUI.val.textContent = String(currentRotation);
+  if (preview instanceof StickerPreview) preview.setRotation(currentRotation);
   if (!drawing) canvas.dispatchEvent(new Event(TOOL_MOVED));
 });
 
 markerBtn.addEventListener("click", () => {
   tool = "marker";
-  preview = new MarkerPreview(currentWidth);
+  preview = new MarkerPreview(currentWidth, currentColor);
   canvas.dispatchEvent(new Event(TOOL_MOVED));
 });
 
@@ -270,10 +359,15 @@ canvas.addEventListener("mousedown", (e) => {
   drawing = true;
   const p = pos(e);
   if (tool === "marker") {
-    currentStroke = new MarkerStroke(p, currentWidth);
+    currentStroke = new MarkerStroke(p, currentWidth, currentColor);
     displayList.push(currentStroke);
   } else {
-    currentSticker = new Sticker(p, stickerChar, currentWidth * 3);
+    currentSticker = new Sticker(
+      p,
+      stickerChar,
+      Math.round(currentWidth * STICKER_FACTOR),
+      currentRotation,
+    );
     displayList.push(currentSticker);
   }
   redoStack.length = 0;
