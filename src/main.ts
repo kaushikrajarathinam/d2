@@ -48,13 +48,15 @@ const markerBtn = document.createElement("button");
 markerBtn.textContent = "Marker";
 toolWrap.appendChild(markerBtn);
 
-const stickerBtns: HTMLButtonElement[] = [];
-["😀", "⭐️", "🔥"].forEach((s) => {
-  const b = document.createElement("button");
-  b.textContent = s;
-  toolWrap.appendChild(b);
-  stickerBtns.push(b);
-});
+const stickerWrap = document.createElement("div");
+stickerWrap.style.display = "inline-flex";
+stickerWrap.style.gap = "6px";
+stickerWrap.style.marginLeft = "8px";
+toolbar.appendChild(stickerWrap);
+
+const addStickerBtn = document.createElement("button");
+addStickerBtn.textContent = "+";
+stickerWrap.appendChild(addStickerBtn);
 
 const canvas = document.createElement("canvas");
 canvas.width = 256;
@@ -215,6 +217,33 @@ let currentStroke: MarkerStroke | null = null;
 let currentSticker: Sticker | null = null;
 let preview: Drawable = new MarkerPreview(currentWidth);
 
+let stickers: string[] = ["😀", "⭐️", "🔥"];
+
+function createStickerButton(s: string) {
+  const b = document.createElement("button");
+  b.textContent = s;
+  b.addEventListener("click", () => {
+    tool = "sticker";
+    stickerChar = s;
+    preview = new StickerPreview(stickerChar, currentWidth * 3);
+    canvas.dispatchEvent(new Event(TOOL_MOVED));
+  });
+  stickerWrap.insertBefore(b, addStickerBtn);
+}
+
+stickers.forEach(createStickerButton);
+
+addStickerBtn.addEventListener("click", () => {
+  const t = prompt("Custom sticker text", "🧽");
+  if (!t) return;
+  stickers.push(t);
+  createStickerButton(t);
+  tool = "sticker";
+  stickerChar = t;
+  preview = new StickerPreview(stickerChar, currentWidth * 3);
+  canvas.dispatchEvent(new Event(TOOL_MOVED));
+});
+
 sizeValue.textContent = String(currentWidth);
 sizeSlider.addEventListener("input", () => {
   currentWidth = parseInt(sizeSlider.value, 10);
@@ -230,15 +259,6 @@ markerBtn.addEventListener("click", () => {
   tool = "marker";
   preview = new MarkerPreview(currentWidth);
   canvas.dispatchEvent(new Event(TOOL_MOVED));
-});
-
-stickerBtns.forEach((b) => {
-  b.addEventListener("click", () => {
-    tool = "sticker";
-    stickerChar = b.textContent || "😀";
-    preview = new StickerPreview(stickerChar, currentWidth * 3);
-    canvas.dispatchEvent(new Event(TOOL_MOVED));
-  });
 });
 
 function pos(e: MouseEvent): Point {
@@ -271,9 +291,7 @@ canvas.addEventListener("mousemove", (e) => {
       canvas.dispatchEvent(new Event(DRAWING_CHANGED));
     }
   } else {
-    if (tool === "marker" && preview instanceof MarkerPreview) {
-      preview.setPosition(p);
-    } else if (tool === "sticker" && preview instanceof StickerPreview) {
+    if (preview instanceof MarkerPreview || preview instanceof StickerPreview) {
       preview.setPosition(p);
     }
     canvas.dispatchEvent(new Event(TOOL_MOVED));
